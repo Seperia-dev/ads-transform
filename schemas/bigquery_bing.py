@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 @dataclass
 class AdTableRecord:
-    time_period:   date
+    data_date:   date
     account_id:    str
     account_name:  str
     campaign_id:   str

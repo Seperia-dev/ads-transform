@@ -3,7 +3,7 @@
 from typing import Any, Optional, List, Dict
 import os
 from google.cloud import bigquery
-
+from datetime import datetime
 from endpoints.database_query import QueryResult, TableInfo
 from logger.gcp_logger import GCPLogger, LogLevel
 
@@ -14,9 +14,7 @@ class BigQueryService():
     Pure BigQuery adapter that connects directly to BigQuery API.
     """
 
-    ADAPTER_NAME = 'BigQuery-Adapter'
-
-    def __init__(self, database_name:str,raise_on_error: bool = False,project_id:str="unidb-442214") -> None:
+    def __init__(self, session_id: str, database_name:str,raise_on_error: bool = False,project_id:str="unidb-442214") -> None:
         """
         Initialize BigQuery adapter with direct BigQuery connection.
 
@@ -30,6 +28,9 @@ class BigQueryService():
         self._database_name = database_name
         self._schema_tables = {}
         self._client = None
+        if session_id is None:
+            session_id = str(int(datetime.utcnow().timestamp()))
+        self.session_id = session_id
         self._initialize_client()
 
     # Cached dictionary of fully-qualified table names in the current BigQuery database schema.
@@ -39,7 +40,7 @@ class BigQueryService():
     @property
     def schema_tables(self) -> List[str]:
         if not self._schema_tables:
-            query = "SELECT table_name FROM `unidb-442214.UniDB.INFORMATION_SCHEMA.TABLES`"
+            query = f"SELECT table_name FROM `{self._project_id}.{self._database_name}.INFORMATION_SCHEMA.TABLES`"
             result = self.execute_query(query)
             if result.success:
                 self._schema_tables = {
@@ -110,7 +111,10 @@ class BigQueryService():
             if self._raise_on_error:
                 raise Exception(error_msg, "query_error") from e
 
-            GCPLogger.log(LogLevel.ERROR, self.ADAPTER_NAME, error_msg)
+            GCPLogger.log(LogLevel.ERROR, "BigQuery-Service", {
+                "session_id": self.session_id,
+                "message": error_msg
+            })
             return QueryResult(
                 data=[],
                 row_count=0,
@@ -120,71 +124,6 @@ class BigQueryService():
                 source=self._database_name
             )
 
-    def execute_transaction(self, queries: List[str]) -> bool:
-        """
-        Execute multiple queries in a transaction.
-        Note: BigQuery has limited transaction support. This executes queries sequentially.
-
-        Args:
-            queries (List[str]): List of SQL queries to execute in sequence
-
-        Returns:
-            bool: True if all queries succeeded, False otherwise
-        """
-        try:
-            # BigQuery doesn't have traditional transactions
-            # Execute queries sequentially and track success
-            for i, query in enumerate(queries):
-                GCPLogger.log(LogLevel.DEBUG, self.ADAPTER_NAME, f"Executing query {i+1}/{len(queries)}")
-                result = self.execute_query(query)
-
-                if not result.success:
-                    GCPLogger.log(LogLevel.ERROR, self.ADAPTER_NAME, f"Transaction failed at query {i+1}")
-                    return False
-
-            GCPLogger.log(LogLevel.INFO, self.ADAPTER_NAME, "Transaction completed successfully")
-            return True
-
-        except Exception as e:
-            error_msg = f"Transaction execution failed: {str(e)}"
-            GCPLogger.log(LogLevel.ERROR, self.ADAPTER_NAME, error_msg)
-
-            if self._raise_on_error:
-                raise Exception(error_msg, "transaction_error") from e
-
-            return False
-
-    def check_connection(self) -> bool:
-        """
-        Check if database connection is active and working.
-
-        Returns:
-            bool: True if connection is working, False otherwise
-        """
-        try:
-            if not self._client:
-                return False
-
-            # Execute a simple query to test connection
-            result = self.execute_query("SELECT 1 as test")
-            return result.row_count == 1
-
-        except Exception as e:
-            GCPLogger.log(LogLevel.WARNING, self.ADAPTER_NAME, f"Connection check failed: {str(e)}")
-            return False
-
-    def get_table_info(self,table_name) -> TableInfo:
-        """
-        Get information about the current environment setup.
-
-        Returns:
-            Dict[str, Any]: Information about database configuration
-        """
-        return {
-            'project_id': self._project_id,
-            'database_name': self._database_name,
-            'table_name': table_name
-        }
 
     def _initialize_client(self) -> None:
         """
@@ -212,24 +151,36 @@ class BigQueryService():
                 # Try default credentials (useful in GCP environments)
                 try:
                     self._client = bigquery.Client(project=self._project_id)
-                    GCPLogger.log(LogLevel.INFO, self.ADAPTER_NAME, f"BigQuery client initialized with default credentials for {self._database_name}")
+                    GCPLogger.log(LogLevel.INFO, "BigQuery-Service", {
+                        "session_id": self.session_id,
+                        "message": f"BigQuery client initialized with default credentials for {self._database_name}"
+                    })
                 except Exception as default_cred_error:
                     error_msg = f"BigQuery credentials not found. Tried: {credentials_path} and default credentials"
-                    GCPLogger.log(LogLevel.ERROR, self.ADAPTER_NAME, error_msg)
+                    GCPLogger.log(LogLevel.ERROR, "BigQuery-Service", {
+                        "session_id": self.session_id,
+                        "message": error_msg
+                    })
 
                     if self._raise_on_error:
                         raise Exception(error_msg, "credentials_missing") from default_cred_error
 
         except ImportError as e:
             error_msg = f"Google Cloud BigQuery library not installed: {e}"
-            GCPLogger.log(LogLevel.ERROR, self.ADAPTER_NAME, error_msg)
+            GCPLogger.log(LogLevel.ERROR, "BigQuery-Service", {
+                "session_id": self.session_id,
+                "message": error_msg
+            })
 
             if self._raise_on_error:
                 raise Exception(error_msg, "library_missing") from e
 
         except Exception as e:
             error_msg = f"Failed to initialize BigQuery client: {str(e)}"
-            GCPLogger.log(LogLevel.ERROR, self.ADAPTER_NAME, error_msg)
+            GCPLogger.log(LogLevel.ERROR, "BigQuery-Service", {
+                "session_id": self.session_id,
+                "message": error_msg
+            })
 
             if self._raise_on_error:
                 raise Exception(error_msg, "initialization_error") from e
