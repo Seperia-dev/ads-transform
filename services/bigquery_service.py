@@ -4,7 +4,7 @@ from typing import Any, Optional, List, Dict
 import os
 from google.cloud import bigquery
 from datetime import datetime
-from endpoints.database_query import QueryResult, TableInfo
+from schemas.database_query import QueryResult
 from logger.gcp_logger import GCPLogger, LogLevel
 
 

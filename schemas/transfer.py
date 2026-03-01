@@ -3,8 +3,9 @@ from typing import Optional
 from pydantic import BaseModel
 
 class TransferRequest(BaseModel):
-    start_date: Optional[date] = None  
-    end_date: Optional[date]   = None
+    from_x_days: int
+    to_x_days: int
+    ad_name: str
 
 
 class TransferResponse(BaseModel):
@@ -17,4 +18,7 @@ class TransferResponse(BaseModel):
     ad_rows: int
     errors: list[str]
     status: str
+
+class AccountTransferRequest(TransferRequest):
+    account_id: str
 

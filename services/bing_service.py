@@ -114,10 +114,7 @@ class BingService:
                     "session_id": self.session_id,
                     "message": f"Error fetching performance for account {account_id}: {str(e)}",
                 })
-        #get recorder with ad_name not empty
-        all_records = [r for r in all_records if r.ad_name]
-        #get distinct campaign_type
-        all_records = list({r.campaign_type: r for r in all_records}.values())
+
         return all_records
 
     def fetch_ad_performance(self, account_id: str, start_date: date, end_date: date):
