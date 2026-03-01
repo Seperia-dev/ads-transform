@@ -21,11 +21,18 @@ def transfer_all_accounts(req: TransferRequest):
     """Upload ad data for all accounts of the given platform."""
     session_id = _make_session_id()
     try:
+        if not req.ad_name:
+            raise ValueError("ad_name is required for single account transfer")
+        if req.from_x_days is None or req.to_x_days is None:
+            raise ValueError("from_x_days and to_x_days are required for single account transfer")
+        if req.from_x_days < req.to_x_days:
+            raise ValueError("from_x_days cannot be greater than to_x_days")
         svc    = _make_service(session_id, req.ad_name)
         result = svc.upload_all_accounts(
             from_x_days=req.from_x_days,
             to_x_days=req.to_x_days,
         )
+        
         return TransferResponse(session_id=session_id, **result)
     except Exception as e:
         GCPLogger.log(LogLevel.ERROR, "transfer-router", {
@@ -40,6 +47,14 @@ def transfer_single_account(req: AccountTransferRequest):
     """Upload ad data for a single account of the given platform."""
     session_id = _make_session_id()
     try:
+        if not req.account_id:
+            raise ValueError("account_id is required for single account transfer")
+        if not req.ad_name:
+            raise ValueError("ad_name is required for single account transfer")
+        if req.from_x_days is None or req.to_x_days is None:
+            raise ValueError("from_x_days and to_x_days are required for single account transfer")
+        if req.from_x_days < req.to_x_days:
+            raise ValueError("from_x_days cannot be less than to_x_days")
         svc    = _make_service(session_id, req.ad_name)
         result = svc.upload_account(
             account_id=req.account_id,

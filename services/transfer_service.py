@@ -72,16 +72,19 @@ class TransferService:
                     "session_id": self.session_id,
                     "message": "No records to upload",
                 })
-                return {"success": True, "rows_uploaded": 0}
+                return {"success": True, "rows_uploaded": 0, "accounts_processed": 0}
 
-            self._delete_date_range(start_date, end_date)
+            #create set of account_ids in the records to optimize deletion
+            account_ids = set(r.account_id for r in records if r.account_id)
+            self._delete_date_range(start_date, end_date, account_ids)
             self._insert_records(records)
 
             GCPLogger.log(LogLevel.INFO, "bingads-transfer-data", {
                 "session_id": self.session_id,
                 "message": f"Uploaded {len(records)} rows for {start_date} -> {end_date}",
+                "accounts_processed": len(account_ids),
             })
-            return {"success": True, "rows_uploaded": len(records)}
+            return {"success": True, "rows_uploaded": len(records), "accounts_processed": len(account_ids)}
 
         except Exception as e:
             GCPLogger.log(LogLevel.ERROR, "bingads-transfer-data", {
@@ -92,34 +95,50 @@ class TransferService:
 
     # ── BigQuery operations ───────────────────────────────────────────────────
 
-    def _delete_date_range(self, start_date: date, end_date: date) -> None:
+
+    def _delete_date_range(
+        self,
+        start_date: date,
+        end_date: date,
+        account_ids: Optional[set[str]] = None,
+    ) -> None:
         """Delete existing rows for the date range to prevent duplicates."""
-        table   = self._full_table_name(self.table_ad_data)
-        query   = f"""
+        table = self._full_table_name(self.table_ad_data)
+        query = f"""
             DELETE FROM `{table}`
             WHERE data_date BETWEEN '{start_date}' AND '{end_date}'
         """
-        self.bigquery.execute_query(query)
+        parameters = None
 
-    def _insert_records(self, records: list[AdTableRecord]) -> None:
-        """Insert ad records into BigQuery."""
+        if account_ids:
+            query += " AND account_id IN UNNEST(@account_ids)"
+            parameters = {"account_ids": list(account_ids)}
+
+        self.bigquery.execute_query(query, parameters)
+
+
+    def _insert_records(self, records: list[AdTableRecord], chunk_size: int = 300) -> None:
+        """Insert ad records into BigQuery in chunks to avoid query size limits."""
         table = self._full_table_name(self.table_ad_data)
-        rows  = ",\n".join([
-            f"('{r.data_date}', {self._q(r.account_id)}, {self._q(r.account_name)}, "
-            f"{self._q(r.campaign_id)}, {self._q(r.campaign_name)}, {self._q(r.campaign_type)}, "
-            f"{self._q(r.ad_group_id)}, {self._q(r.ad_group_name)}, {self._q(r.ad_id)}, {self._q(r.ad_name)}, "
-            f"{self._q(r.device_type)}, {self._q(r.final_url)}, "
-            f"{r.impressions}, {r.clicks}, {r.spend}, {r.conversions})"
-            for r in records
-        ])
-        query = f"""
-            INSERT INTO `{table}`
-            (data_date, account_id, account_name, campaign_id, campaign_name,
-             campaign_type, ad_group_id, ad_group_name, ad_id, ad_name,
-             device_type, final_url, impressions, clicks, spend, conversions)
-            VALUES {rows}
-        """
-        self.bigquery.execute_query(query)
+
+        for i in range(0, len(records), chunk_size):
+            chunk = records[i:i + chunk_size]
+            rows  = ",\n".join([
+                f"('{r.data_date}', {self._q(r.account_id)}, {self._q(r.account_name)}, "
+                f"{self._q(r.campaign_id)}, {self._q(r.campaign_name)}, {self._q(r.campaign_type)}, "
+                f"{self._q(r.ad_group_id)}, {self._q(r.ad_group_name)}, {self._q(r.ad_id)}, {self._q(r.ad_name)}, "
+                f"{self._q(r.device_type)}, {self._q(r.final_url)}, "
+                f"{r.impressions}, {r.clicks}, {r.spend}, {r.conversions})"
+                for r in chunk
+            ])
+            query = f"""
+                INSERT INTO `{table}`
+                (data_date, account_id, account_name, campaign_id, campaign_name,
+                campaign_type, ad_group_id, ad_group_name, ad_id, ad_name,
+                device_type, final_url, impressions, clicks, spend, conversions)
+                VALUES {rows}
+            """
+            self.bigquery.execute_query(query)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

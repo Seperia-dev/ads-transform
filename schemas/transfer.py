@@ -10,14 +10,9 @@ class TransferRequest(BaseModel):
 
 class TransferResponse(BaseModel):
     session_id: str
-    start_date: str
-    end_date: str
     accounts_processed: int
-    campaign_rows: int
-    ad_group_rows: int
-    ad_rows: int
-    errors: list[str]
-    status: str
+    rows_uploaded: int
+    success: bool
 
 class AccountTransferRequest(TransferRequest):
     account_id: str
