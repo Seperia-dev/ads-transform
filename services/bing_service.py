@@ -10,7 +10,7 @@ from bingads.v13.reporting import ReportingDownloadParameters
 from bingads.v13.reporting.reporting_service_manager import ReportingServiceManager
 
 from logger.gcp_logger import GCPLogger, LogLevel
-from schemas.bigquery_bing import AdTableRecord
+from schemas.bigquery_bing import BingAdTableRecord
 
 
 class BingService:
@@ -177,7 +177,7 @@ class BingService:
         report_container = mgr.download_report(dl)
         return self._parse_ad_report(report_container)
 
-    def _parse_ad_report(self, report_container) -> list[AdTableRecord]:
+    def _parse_ad_report(self, report_container) -> list[BingAdTableRecord]:
         records = []
 
         if report_container is None:
@@ -192,7 +192,7 @@ class BingService:
                 except Exception:
                     return None
 
-            records.append(AdTableRecord(
+            records.append(BingAdTableRecord(
                 data_date   = date.fromisoformat(col("TimePeriod")),
                 account_id    = col("AccountId")    or "",
                 account_name  = col("AccountName")  or "",
