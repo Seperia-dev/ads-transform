@@ -1,0 +1,28 @@
+# Local env / secrets (never bake into image)
+.env
+private/
+
+# Python artifacts
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Logs
+logger/logs/
+*.log
+
+# Dev-only scripts
+playground.py
+
+# Git
+.git/
+.gitignore

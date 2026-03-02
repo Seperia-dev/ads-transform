@@ -1,0 +1,42 @@
+services:
+  ads_transfer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: ads_transfer
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+    environment:
+      # App
+      PORT: 8000
+      DEBUG: "false"
+      ALLOWED_ORIGINS: "https://n8n.seperia.com"
+
+      # GCP — service account key mounted below
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcp_key.json
+      GOOGLE_CLOUD_PROJECT: unidb-442214
+
+      # Microsoft Ads — values come from your .env file
+      MICROSOFT_ADS_DEVELOPER_TOKEN: ${MICROSOFT_ADS_DEVELOPER_TOKEN}
+      MICROSOFT_ADS_CLIENT_ID:       ${MICROSOFT_ADS_CLIENT_ID}
+      MICROSOFT_ADS_CLIENT_SECRET:   ${MICROSOFT_ADS_CLIENT_SECRET}
+      MICROSOFT_ADS_REFRESH_TOKEN:   ${MICROSOFT_ADS_REFRESH_TOKEN}
+      MICROSOFT_ADS_CUSTOMER_ID:     ${MICROSOFT_ADS_CUSTOMER_ID}
+
+    volumes:
+      # Mount your GCP service account key (never bake it into the image)
+      - ./private/unidb-442214-7579bc2c1da6.json:/secrets/gcp_key.json:ro
+
+    env_file:
+      - .env          # loads any extra vars not listed above
+
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

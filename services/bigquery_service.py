@@ -135,7 +135,7 @@ class BigQueryService():
 
 
             # Get credentials from service account file
-            credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'private/automations-and-plugins-6af5a4621ff9.json')
+            credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'private/unidb-442214-7579bc2c1da6.json')
 
             if os.path.exists(credentials_path):
                 # Use service account credentials
