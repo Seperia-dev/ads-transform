@@ -3,7 +3,7 @@ from typing import Optional
 
 from logger.gcp_logger import GCPLogger, LogLevel
 from services.bigquery_service import BigQueryService
-from schemas.bigquery_bing import AdTableRecord
+from schemas.bigquery_bing import BingAdTableRecord
 
 
 
@@ -28,6 +28,7 @@ class TransferService:
                 self.ads_service = BingService(session_id=self.session_id)
             case _:
                 raise ValueError(f"Unsupported ad platform: {ad_name}")
+
     def _set_bigquery_service(self,ad_name):
         match ad_name:
             case "bing":
@@ -60,7 +61,7 @@ class TransferService:
 
     # ── Core upload logic ─────────────────────────────────────────────────────
 
-    def _upload_records(self, records: list[AdTableRecord], start_date: date, end_date: date) -> dict:
+    def _upload_records(self, records: list[BingAdTableRecord], start_date: date, end_date: date) -> dict:
         try:
             GCPLogger.log(LogLevel.INFO, "bingads-transfer-data", {
                 "session_id": self.session_id,
@@ -117,7 +118,7 @@ class TransferService:
         self.bigquery.execute_query(query, parameters)
 
 
-    def _insert_records(self, records: list[AdTableRecord], chunk_size: int = 300) -> None:
+    def _insert_records(self, records: list[BingAdTableRecord], chunk_size: int = 300) -> None:
         """Insert ad records into BigQuery in chunks to avoid query size limits."""
         table = self._full_table_name(self.table_ad_data)
 

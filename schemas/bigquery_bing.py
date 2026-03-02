@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class AdTableRecord:
+class BingAdTableRecord:
     data_date:   date
     account_id:    str
     account_name:  str
