@@ -11,6 +11,7 @@ from bingads.v13.reporting.reporting_service_manager import ReportingServiceMana
 
 from logger.gcp_logger import GCPLogger, LogLevel
 from schemas.bigquery_bing import BingAdTableRecord
+from services.backgroundTaskLog import BackgroundTaskLog
 
 
 class BingService:
@@ -18,8 +19,9 @@ class BingService:
     POLL_INTERVAL    = 10   # seconds
     MAX_POLL_TIMEOUT = 600  # seconds
 
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str,background_task_log: BackgroundTaskLog | None = None) -> None:
         self.session_id        = session_id
+        self.background_task_log          = background_task_log
         self._authorization_data: Optional[AuthorizationData] = None
         self._environment      = self.ENVIRONMENT
         self._initialize_client()
@@ -99,9 +101,12 @@ class BingService:
         end_date: date,
     ) -> list[BingAdTableRecord]:
         all_records = []
+        self._update_task_log(step="Fetching Bing Accounts")
         account_ids = self.get_account_ids()
-        for account_id in account_ids:
+        total_accounts = len(account_ids)
+        for idx, account_id in enumerate(account_ids):
             try:
+                self._update_task_log(step=f"Fetching Account Performance ({idx+1} of {total_accounts})")
                 records = self.fetch_ad_performance(
                     account_id=account_id,
                     start_date=start_date,
@@ -331,3 +336,7 @@ class BingService:
             CampaignType="Search Shopping DynamicSearchAds Audience PerformanceMax",
         )
         return list({c.CampaignType for c in response.Campaign or []})
+
+    def _update_task_log(self,  step:   str | None = None,status: str | None = None) -> None:
+        if self.background_task_log:
+            self.background_task_log.update_task(step=step, status=status)

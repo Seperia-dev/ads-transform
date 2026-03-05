@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from logger.gcp_logger import GCPLogger, LogLevel
+from services.backgroundTaskLog import BackgroundTaskLog
 from services.bigquery_service import BigQueryService
 from schemas.bigquery_bing import BingAdTableRecord
 
@@ -10,12 +11,13 @@ from schemas.bigquery_bing import BingAdTableRecord
 
 
 class TransferService:
-    def __init__(self, session_id: str, ad_name: str = ""):
+    def __init__(self, session_id: str, ad_name: str = "",background_task_log: BackgroundTaskLog | None = None) -> None:
         if session_id is None:
             session_id = str(int(datetime.utcnow().timestamp()))
         self.session_id  = session_id
         self.ads_service = None
         self.bigquery = None
+        self.background_task_log = background_task_log
         self._set_ads_service(ad_name)
         self._set_bigquery_service(ad_name)
 
@@ -25,7 +27,7 @@ class TransferService:
         match ad_name:
             case "bing":
                 from services.bing_service import BingService
-                self.ads_service = BingService(session_id=self.session_id)
+                self.ads_service = BingService(session_id=self.session_id, background_task_log=self.background_task_log)
             case _:
                 raise ValueError(f"Unsupported ad platform: {ad_name}")
 
@@ -52,6 +54,7 @@ class TransferService:
     def upload_account(self, account_id: str, from_x_days: int, to_x_days: int) -> dict:
         """Upload ad data for a single account."""
         start_date, end_date = self._get_date_range(from_x_days, to_x_days)
+        self._update_task_step(f"Fetching data for specific account: {account_id}")
         records = self.ads_service.fetch_ad_performance(
             account_id=account_id,
             start_date=start_date,
@@ -77,6 +80,7 @@ class TransferService:
 
             #create set of account_ids in the records to optimize deletion
             account_ids = set(r.account_id for r in records if r.account_id)
+            self._update_task_step(f"Delete BigQuery data for {len(account_ids)} accounts")
             self._delete_date_range(start_date, end_date, account_ids)
             self._insert_records(records)
 
@@ -85,7 +89,11 @@ class TransferService:
                 "message": f"Uploaded {len(records)} rows for {start_date} -> {end_date}",
                 "accounts_processed": len(account_ids),
             })
-            return {"success": True, "rows_uploaded": len(records), "accounts_processed": len(account_ids)}
+            res={"success": True, "rows_uploaded": len(records), "accounts_processed": len(account_ids)}
+            self._update_task_step(f"Task completed for {start_date} -> {end_date}")
+            if self.background_task_log:
+                self.background_task_log.end_task(result=res)
+            return res
 
         except Exception as e:
             GCPLogger.log(LogLevel.ERROR, "bingads-transfer-data", {
@@ -121,8 +129,10 @@ class TransferService:
     def _insert_records(self, records: list[BingAdTableRecord], chunk_size: int = 300) -> None:
         """Insert ad records into BigQuery in chunks to avoid query size limits."""
         table = self._full_table_name(self.table_ad_data)
+        total_chunks = -(-len(records) // chunk_size)
 
         for i in range(0, len(records), chunk_size):
+            chunk_num = (i // chunk_size) + 1
             chunk = records[i:i + chunk_size]
             rows  = ",\n".join([
                 f"('{r.data_date}', {self._q(r.account_id)}, {self._q(r.account_name)}, "
@@ -139,6 +149,7 @@ class TransferService:
                 device_type, final_url, impressions, clicks, spend, conversions)
                 VALUES {rows}
             """
+            self._update_task_step(f"Inserting Chunk {chunk_num} of {total_chunks}")
             self.bigquery.execute_query(query)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
@@ -158,3 +169,7 @@ class TransferService:
             return "NULL"
         escaped = str(val).replace("'", "\\'")
         return f"'{escaped}'"
+
+    def _update_task_step(self, step: str) -> None:
+        if self.background_task_log:
+            self.background_task_log.update_task(step=step)
