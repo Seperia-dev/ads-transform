@@ -30,11 +30,11 @@ class BackgroundTaskLog:
         self.req_args:    dict[str, Any] | None      = self._resolve_req_args(req_args)
         self.result:      dict[str, Any] | None      = None
         self.error:       str | None                 = None
-        self.finished_at: str | None                 = None
+        self.finished_at: int | None                 = None
         if session_id is not None:
             self.created_at = session_id
         else:
-            self.created_at:  str                   = str(int(datetime.now(timezone.utc).timestamp()))
+            self.created_at:  int                   = int(datetime.now(timezone.utc).timestamp())
 
         self._bq = BigQueryService(
             session_id=self.task_id,
@@ -61,7 +61,7 @@ class BackgroundTaskLog:
                 "status":     self.status,
                 "step":       self.step,
                 "req_args":   self._to_json_str(self.req_args),
-                "created_at": str(self.created_at),
+                "created_at": int(self.created_at),
             }
             self._execute(query, params)
         except Exception as e:
@@ -111,7 +111,7 @@ class BackgroundTaskLog:
         try:
             self.status      = self.STATUS_DONE
             self.step        = step
-            self.finished_at = str(datetime.utcnow().timestamp())
+            self.finished_at = int(datetime.utcnow().timestamp())
             self.result      = result.to_dict() if isinstance(result, TaskResult) else result
 
             clauses = [
@@ -143,7 +143,7 @@ class BackgroundTaskLog:
         try:
             self.status      = self.STATUS_FAILED
             self.error       = error
-            self.finished_at = str(datetime.utcnow().timestamp())
+            self.finished_at = int(datetime.utcnow().timestamp())
 
             clauses = [
                 "status      = @status",
