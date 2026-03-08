@@ -11,7 +11,7 @@ from bingads.v13.reporting.reporting_service_manager import ReportingServiceMana
 
 from logger.gcp_logger import GCPLogger, LogLevel
 from schemas.bigquery_bing import BingAdTableRecord
-from services.backgroundTaskLog import BackgroundTaskLog
+from services.background_task_log import BackgroundTaskLog
 
 
 class BingService:

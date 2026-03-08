@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from logger.gcp_logger import GCPLogger, LogLevel
-from services.backgroundTaskLog import BackgroundTaskLog
+from services.background_task_log import BackgroundTaskLog
 from services.bigquery_service import BigQueryService
 from schemas.bigquery_bing import BingAdTableRecord
 

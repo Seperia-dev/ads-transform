@@ -34,7 +34,7 @@ class BackgroundTaskLog:
         if session_id is not None:
             self.created_at = session_id
         else:
-            self.created_at:  str                   = str(datetime.now(timezone.utc).timestamp())
+            self.created_at:  str                   = str(int(datetime.now(timezone.utc).timestamp()))
 
         self._bq = BigQueryService(
             session_id=self.task_id,
@@ -53,7 +53,7 @@ class BackgroundTaskLog:
                 INSERT INTO {self.TABLE_ID}
                     (task_id, name, status, step, req_args, result, task_error, created_at, finished_at)
                 VALUES
-                    (@task_id, @name, @status, @step, PARSE_JSON(@req_args), NULL, NULL, @created_at, NULL)
+                    (@task_id, @name, @status, @step, @req_args, NULL, NULL, @created_at, NULL)
             """
             params = {
                 "task_id":    self.task_id,
@@ -118,7 +118,7 @@ class BackgroundTaskLog:
                 "status      = @status",
                 "step        = @step",
                 "finished_at = @finished_at",
-                "result      = PARSE_JSON(@result)",
+                "result      = @result",
             ]
             params = {
                 "task_id":     self.task_id,
@@ -197,7 +197,7 @@ class BackgroundTaskLog:
         return req_args
 
     @staticmethod
-    def _to_json_str(value: dict[str, Any] | None) -> str | None:
+    def _to_json_str(value: dict | None) -> str | None:
         if value is None:
             return None
-        return json.dumps(value)
+        return json.dumps(value, default=lambda o: o.model_dump() if hasattr(o, 'model_dump') else str(o))
