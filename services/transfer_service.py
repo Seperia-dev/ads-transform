@@ -66,13 +66,13 @@ class TransferService:
 
     def _upload_records(self, records: list[BingAdTableRecord], start_date: date, end_date: date) -> dict:
         try:
-            GCPLogger.log(LogLevel.INFO, "bingads-transfer-data", {
+            GCPLogger.log(LogLevel.INFO, "transfer_data", {
                 "session_id": self.session_id,
                 "message": f"Transfer started for {start_date} -> {end_date}",
             })
 
             if not records:
-                GCPLogger.log(LogLevel.INFO, "bingads-transfer-data", {
+                GCPLogger.log(LogLevel.INFO, "transfer_data", {
                     "session_id": self.session_id,
                     "message": "No records to upload",
                 })
@@ -81,10 +81,16 @@ class TransferService:
             #create set of account_ids in the records to optimize deletion
             account_ids = set(r.account_id for r in records if r.account_id)
             self._update_task_step(f"Delete BigQuery data for {len(account_ids)} accounts")
+            GCPLogger.log(LogLevel.INFO, "transfer_data", {
+                "session_id": self.session_id,
+                "message": f"Preparing to delete existing data for {len(account_ids)} accounts",
+                "accounts": list(account_ids),
+            })
+
             self._delete_date_range(start_date, end_date, account_ids)
             self._insert_records(records)
 
-            GCPLogger.log(LogLevel.INFO, "bingads-transfer-data", {
+            GCPLogger.log(LogLevel.INFO, "transfer_data", {
                 "session_id": self.session_id,
                 "message": f"Uploaded {len(records)} rows for {start_date} -> {end_date}",
                 "accounts_processed": len(account_ids),
@@ -96,7 +102,7 @@ class TransferService:
             return res
 
         except Exception as e:
-            GCPLogger.log(LogLevel.ERROR, "bingads-transfer-data", {
+            GCPLogger.log(LogLevel.ERROR, "transfer_data_error", {
                 "session_id": self.session_id,
                 "message": f"Error occurred: {str(e)}",
             })
@@ -130,7 +136,10 @@ class TransferService:
         """Insert ad records into BigQuery in chunks to avoid query size limits."""
         table = self._full_table_name(self.table_ad_data)
         total_chunks = -(-len(records) // chunk_size)
-
+        GCPLogger.log(LogLevel.INFO, "transfer_data", {
+            "session_id": self.session_id,
+            "message": f"Starting to insert {len(records)} records in {total_chunks} chunks",
+        })
         for i in range(0, len(records), chunk_size):
             chunk_num = (i // chunk_size) + 1
             chunk = records[i:i + chunk_size]
@@ -151,6 +160,10 @@ class TransferService:
             """
             self._update_task_step(f"Inserting Chunk {chunk_num} of {total_chunks}")
             self.bigquery.execute_query(query)
+            GCPLogger.log(LogLevel.INFO, "transfer_data", {
+                "session_id": self.session_id,
+                "message": f"Inserted Chunk {chunk_num} of {total_chunks}",
+            })
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

@@ -17,6 +17,12 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
     session_id = _make_session_id()
     background_task_log   = None
     try:
+        GCPLogger.log(LogLevel.INFO, "transfer_all_accounts", {
+            "session_id": session_id,
+            "ad_name": req.ad_name,
+            "from_x_days": req.from_x_days,
+            "to_x_days": req.to_x_days,
+        })
         if not req.ad_name:
             raise ValueError("ad_name is required")
         if req.from_x_days is None or req.to_x_days is None:
@@ -28,6 +34,7 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
             background_task_log = _make_background_task_log(
                 name=f"transfer_all_{req.ad_name}",
                 req_args=req.model_dump(exclude={"background"}),
+                session_id=session_id,
             )
             transfer_service = _make_transfer_service(session_id, req.ad_name, background_task_log)
             background_tasks.add_task(
@@ -48,6 +55,10 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
             from_x_days=req.from_x_days,
             to_x_days=req.to_x_days,
         )
+        GCPLogger.log(LogLevel.INFO, "transfer_all_accounts_result", {
+            "session_id": session_id,
+            "result": result,
+        })
         return TransferResponse(session_id=session_id, **result)
 
     except Exception as e:
@@ -61,6 +72,13 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
     session_id = _make_session_id()
     background_task_log   = None
     try:
+        GCPLogger.log(LogLevel.INFO, "transfer_single_account", {
+            "session_id": session_id,
+            "account_id": req.account_id,
+            "ad_name": req.ad_name,
+            "from_x_days": req.from_x_days,
+            "to_x_days": req.to_x_days,
+        })
         if not req.account_id:
             raise ValueError("account_id is required")
         if not req.ad_name:
@@ -74,6 +92,7 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
             background_task_log = _make_background_task_log(
                 name=f"transfer_account_{req.ad_name}",
                 req_args=req.model_dump(exclude={"background"}),
+                session_id=session_id,
             )
             transfer_service = _make_transfer_service(session_id, req.ad_name, background_task_log)
             background_tasks.add_task(
@@ -96,6 +115,10 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
             from_x_days=req.from_x_days,
             to_x_days=req.to_x_days,
         )
+        GCPLogger.log(LogLevel.INFO, "transfer_single_account_result", {
+            "session_id": session_id,
+            "result": result,
+        })
         return TransferResponse(session_id=session_id, **result)
 
     except Exception as e:
@@ -106,7 +129,7 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
 
 def _handle_error(e: Exception, session_id: str, background_task_log: BackgroundTaskLog | None) -> None:
     error_msg = str(e)
-    GCPLogger.log(LogLevel.ERROR, "transfer-router", {
+    GCPLogger.log(LogLevel.ERROR, "transfer_error", {
         "session_id": session_id,
         "message": error_msg,
     })
@@ -131,5 +154,5 @@ def _make_transfer_service(
     )
 
 
-def _make_background_task_log(name: str, req_args: dict) -> BackgroundTaskLog:
-    return BackgroundTaskLog(name=name, req_args=req_args)
+def _make_background_task_log(name: str, req_args: dict, session_id: str | None = None) -> BackgroundTaskLog:
+    return BackgroundTaskLog(name=name, req_args=req_args, session_id=session_id)

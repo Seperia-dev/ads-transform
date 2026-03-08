@@ -51,12 +51,12 @@ class BingService:
                 authentication=authentication,
             )
 
-            GCPLogger.log(LogLevel.INFO, "bingads-transfer-data", {
+            GCPLogger.log(LogLevel.INFO, "Bing", {
                 "session_id": self.session_id,
                 "message": "Microsoft Ads authentication successful",
             })
         except Exception as e:
-            GCPLogger.log(LogLevel.ERROR, "bingads-transfer-data", {
+            GCPLogger.log(LogLevel.ERROR, "Bing", {
                 "session_id": self.session_id,
                 "message": f"Authentication error: {str(e)}",
             })
@@ -80,14 +80,14 @@ class BingService:
             svc      = self._create_service_client("0", "CustomerManagementService")
             response = svc.GetAccountsInfo()
             ids      = [str(a.Id) for a in response.AccountInfo]
-            GCPLogger.log(LogLevel.INFO, "bingads-transfer-data", {
+            GCPLogger.log(LogLevel.INFO, "Bing", {
                 "session_id": self.session_id,
                 "message": f"Found {len(ids)} accounts",
                 "ids": ids,
             })
             return ids
         except Exception as e:
-            GCPLogger.log(LogLevel.ERROR, "bingads-transfer-data", {
+            GCPLogger.log(LogLevel.ERROR, "Bing", {
                 "session_id": self.session_id,
                 "message": f"Error occurred: {str(e)}",
             })
@@ -115,7 +115,7 @@ class BingService:
                 if records:
                     all_records.extend(records)
             except Exception as e:
-                GCPLogger.log(LogLevel.ERROR, "bingads-transfer-data", {
+                GCPLogger.log(LogLevel.ERROR, "Bing", {
                     "session_id": self.session_id,
                     "message": f"Error fetching performance for account {account_id}: {str(e)}",
                 })
@@ -314,14 +314,14 @@ class BingService:
                 )
                 for campaign in response.Campaign or []:
                     if str(campaign.Id) == str(campaign_id):
-                        GCPLogger.log(LogLevel.INFO, "bingads-transfer-data", {
+                        GCPLogger.log(LogLevel.INFO, "Bing", {
                             "session_id": self.session_id,
                             "message": f"Found campaign {campaign_id} in account {account_id}",
                             "campaign_name": campaign.Name,
                         })
                         return account_id
             except Exception as e:
-                GCPLogger.log(LogLevel.ERROR, "bingads-transfer-data", {
+                GCPLogger.log(LogLevel.ERROR, "Bing", {
                     "session_id": self.session_id,
                     "message": f"Error checking account {account_id}: {str(e)}",
                 })

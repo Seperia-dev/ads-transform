@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from logger.gcp_logger import GCPLogger, LogLevel
 from schemas.background_task import TaskReqArgs, TaskResult
 from services.bigquery_service import BigQueryService
 
@@ -20,6 +21,7 @@ class BackgroundTaskLog:
         self,
         name:     str,
         req_args: TaskReqArgs | dict[str, Any] | None = None,
+        session_id: str | None = None,
     ) -> None:
         self.task_id:     str                        = str(uuid.uuid4())
         self.name:        str                        = name
@@ -28,8 +30,11 @@ class BackgroundTaskLog:
         self.req_args:    dict[str, Any] | None      = self._resolve_req_args(req_args)
         self.result:      dict[str, Any] | None      = None
         self.error:       str | None                 = None
-        self.created_at:  datetime                   = datetime.now(timezone.utc)
-        self.finished_at: datetime | None            = None
+        self.finished_at: str | None                 = None
+        if session_id is not None:
+            self.created_at = session_id
+        else:
+            self.created_at:  str                   = str(datetime.now(timezone.utc).timestamp())
 
         self._bq = BigQueryService(
             session_id=self.task_id,
@@ -42,22 +47,29 @@ class BackgroundTaskLog:
     # ------------------------------------------------------------------
 
     def create_new_task(self) -> None:
-        """Insert the initial task row into BigQuery."""
-        query = f"""
-            INSERT INTO {self.TABLE_ID}
-                (task_id, name, status, step, req_args, result, error, created_at, finished_at)
-            VALUES
-                (@task_id, @name, @status, @step, PARSE_JSON(@req_args), NULL, NULL, @created_at, NULL)
-        """
-        params = {
-            "task_id":    self.task_id,
-            "name":       self.name,
-            "status":     self.status,
-            "step":       self.step,
-            "req_args":   self._to_json_str(self.req_args),
-            "created_at": self.created_at.isoformat(),
-        }
-        self._execute(query, params)
+        try:
+            """Insert the initial task row into BigQuery."""
+            query = f"""
+                INSERT INTO {self.TABLE_ID}
+                    (task_id, name, status, step, req_args, result, task_error, created_at, finished_at)
+                VALUES
+                    (@task_id, @name, @status, @step, PARSE_JSON(@req_args), NULL, NULL, @created_at, NULL)
+            """
+            params = {
+                "task_id":    self.task_id,
+                "name":       self.name,
+                "status":     self.status,
+                "step":       self.step,
+                "req_args":   self._to_json_str(self.req_args),
+                "created_at": str(self.created_at),
+            }
+            self._execute(query, params)
+        except Exception as e:
+            GCPLogger.log(LogLevel.ERROR, "background_task_log_error", {
+                "task_id": self.task_id,
+                "session_id": self.created_at,
+                "message": f"Error creating new task: {str(e)}",
+            })
 
     def update_task(
         self,
@@ -65,23 +77,30 @@ class BackgroundTaskLog:
         step:   str | None = None,
     ) -> None:
         """Update status and/or step. Only provided fields are written."""
-        clauses: list[str] = []
-        params:  dict[str, Any] = {"task_id": self.task_id}
+        try:
+            clauses: list[str] = []
+            params:  dict[str, Any] = {"task_id": self.task_id}
 
-        if status is not None:
-            self.status = status
-            clauses.append("status = @status")
-            params["status"] = status
+            if status is not None:
+                self.status = status
+                clauses.append("status = @status")
+                params["status"] = status
 
-        if step is not None:
-            self.step = step
-            clauses.append("step = @step")
-            params["step"] = step
+            if step is not None:
+                self.step = step
+                clauses.append("step = @step")
+                params["step"] = step
 
-        if not clauses:
-            return
+            if not clauses:
+                return
 
-        self._run_update(clauses, params)
+            self._run_update(clauses, params)
+        except Exception as e:
+            GCPLogger.log(LogLevel.ERROR, "background_task_log_error", {
+                "task_id": self.task_id,
+                "session_id": self.created_at,
+                "message": f"Error updating task: {str(e)}",
+            })
 
     def end_task(
         self,
@@ -89,51 +108,65 @@ class BackgroundTaskLog:
         step:   str = "end",
     ) -> None:
         """Mark task as done, persist result and finished_at."""
-        self.status      = self.STATUS_DONE
-        self.step        = step
-        self.finished_at = datetime.now(timezone.utc)
-        self.result      = result.to_dict() if isinstance(result, TaskResult) else result
+        try:
+            self.status      = self.STATUS_DONE
+            self.step        = step
+            self.finished_at = str(datetime.utcnow().timestamp())
+            self.result      = result.to_dict() if isinstance(result, TaskResult) else result
 
-        clauses = [
-            "status      = @status",
-            "step        = @step",
-            "finished_at = @finished_at",
-            "result      = PARSE_JSON(@result)",
-        ]
-        params = {
-            "task_id":     self.task_id,
-            "status":      self.STATUS_DONE,
-            "step":        step,
-            "finished_at": self.finished_at.isoformat(),
-            "result":      self._to_json_str(self.result),
-        }
-        self._run_update(clauses, params)
+            clauses = [
+                "status      = @status",
+                "step        = @step",
+                "finished_at = @finished_at",
+                "result      = PARSE_JSON(@result)",
+            ]
+            params = {
+                "task_id":     self.task_id,
+                "status":      self.STATUS_DONE,
+                "step":        step,
+                "finished_at": self.finished_at,
+                "result":      self._to_json_str(self.result),
+            }
+            self._run_update(clauses, params)
+        except Exception as e:
+            GCPLogger.log(LogLevel.ERROR, "background_task_log_error", {
+                "task_id": self.task_id,
+                "session_id": self.created_at,
+                "message": f"Error updating (End) task: {str(e)}",
+            })
 
     def fail_task(
         self,
         error: str,
     ) -> None:
         """Mark task as failed with an error message."""
-        self.status      = self.STATUS_FAILED
-        self.error       = error
-        self.finished_at = datetime.now(timezone.utc)
+        try:
+            self.status      = self.STATUS_FAILED
+            self.error       = error
+            self.finished_at = str(datetime.utcnow().timestamp())
 
-        clauses = [
-            "status      = @status",
-            "error       = @error",
-            "finished_at = @finished_at",
-        ]
-        params: dict[str, Any] = {
-            "task_id":     self.task_id,
-            "status":      self.STATUS_FAILED,
-            "error":       error,
-            "finished_at": self.finished_at.isoformat(),
-        }
-        if self.step:
-            clauses.append("step = @step")
-            params["step"] = self.step
+            clauses = [
+                "status      = @status",
+                "task_error  = @task_error",
+                "finished_at = @finished_at",
+            ]
+            params: dict[str, Any] = {
+                "task_id":     self.task_id,
+                "status":      self.STATUS_FAILED,
+                "task_error":  error,
+                "finished_at": self.finished_at,
+            }
+            if self.step:
+                clauses.append("step = @step")
+                params["step"] = self.step
 
-        self._run_update(clauses, params)
+            self._run_update(clauses, params)
+        except Exception as e:
+            GCPLogger.log(LogLevel.ERROR, "background_task_log_error", {
+                "task_id": self.task_id,
+                "session_id": self.created_at,
+                "message": f"Error updating (Fail) task: {str(e)}",
+            })
 
     # ------------------------------------------------------------------
     # Private helpers
