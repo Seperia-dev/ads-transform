@@ -4,6 +4,7 @@ import json
 from dotenv import load_dotenv
 from google.cloud import logging
 from enum import Enum
+import requests
 from logger.app_logger import get_logger
 app_logger = get_logger()
 load_dotenv()
@@ -28,12 +29,27 @@ class GCPLogger:
         """
         try:
             if GCPLogger._client is None:
-                GCPLogger._client = logging.Client.from_service_account_json(service_account_json)
+                if GCPLogger._is_running_on_gcp():
+                    GCPLogger.initialize()
+                else:
+                    GCPLogger.initialize('private/unidb-442214-7579bc2c1da6.json')
         except Exception as e:
             # Log the exception details using Python's standard logging
             app_logger.error(f"Failed to initialize GCPLogger: {e}")
             # Optionally, re-raise the exception or handle it as needed
             # raise
+
+    @staticmethod
+    def _is_running_on_gcp() -> bool:
+        try:
+            response = requests.get(
+                "http://metadata.google.internal",
+                headers={"Metadata-Flavor": "Google"},
+                timeout=1
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
 
     @staticmethod
     def log(log_level: LogLevel, log_name: str, data: dict | str,send_mail_alert:bool=False):
