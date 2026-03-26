@@ -64,7 +64,7 @@ class GCPLogger:
         """
         try:
             # Determine environment
-            is_prod = os.getenv('ENV', "local") == "prod"
+            is_prod = os.getenv('environment', "prod") == "prod"
 
             #local env print log to file
             if not is_prod:
