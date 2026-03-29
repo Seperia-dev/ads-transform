@@ -6,6 +6,7 @@ from google.cloud import logging
 from enum import Enum
 import requests
 from logger.app_logger import get_logger
+from utils import Utils
 app_logger = get_logger()
 load_dotenv()
 
@@ -29,7 +30,7 @@ class GCPLogger:
         """
         try:
             if GCPLogger._client is None:
-                if GCPLogger._is_running_on_gcp():
+                if Utils.is_running_on_gcp():
                     GCPLogger._client = logging.Client()# ADC - no JSON needed
                 else:
                     GCPLogger._client = logging.Client.from_service_account_json(service_account_json)
@@ -40,17 +41,8 @@ class GCPLogger:
             # raise
 
 
-    @staticmethod
-    def _is_running_on_gcp() -> bool:
-        try:
-            response = requests.get(
-                "http://metadata.google.internal",
-                headers={"Metadata-Flavor": "Google"},
-                timeout=1
-            )
-            return response.status_code == 200
-        except Exception:
-            return False
+
+
     @staticmethod
     def log(log_level: LogLevel, log_name: str, data: dict | str,send_mail_alert:bool=False):
         """

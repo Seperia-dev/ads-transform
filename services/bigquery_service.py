@@ -6,6 +6,7 @@ from google.cloud import bigquery
 from datetime import datetime
 from schemas.database_query import QueryResult
 from logger.gcp_logger import GCPLogger, LogLevel
+from utils import Utils
 
 
 
@@ -125,6 +126,7 @@ class BigQueryService():
             )
 
 
+
     def _initialize_client(self) -> None:
         """
         Initialize BigQuery client directly without using the old connector.
@@ -133,37 +135,17 @@ class BigQueryService():
             from google.cloud import bigquery
             from google.oauth2.service_account import Credentials
 
-
-            # Get credentials from service account file
-            credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'private/unidb-442214-7579bc2c1da6.json')
-
-            if os.path.exists(credentials_path):
-                # Use service account credentials
+            if Utils.is_running_on_gcp():
+                # Use ADC on GCP (VM/Cloud Run service account)
+                self._client = bigquery.Client(project=self._project_id)
+            else:
+                # Use service account JSON locally
+                credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'private/unidb-442214-7579bc2c1da6.json')
                 credentials = Credentials.from_service_account_file(credentials_path)
-
-                # Initialize BigQuery client
                 self._client = bigquery.Client(
                     credentials=credentials,
                     project=self._project_id
                 )
-
-            else:
-                # Try default credentials (useful in GCP environments)
-                try:
-                    self._client = bigquery.Client(project=self._project_id)
-                    GCPLogger.log(LogLevel.INFO, "BigQuery-Service", {
-                        "session_id": self.session_id,
-                        "message": f"BigQuery client initialized with default credentials for {self._database_name}"
-                    })
-                except Exception as default_cred_error:
-                    error_msg = f"BigQuery credentials not found. Tried: {credentials_path} and default credentials"
-                    GCPLogger.log(LogLevel.ERROR, "BigQuery-Service", {
-                        "session_id": self.session_id,
-                        "message": error_msg
-                    })
-
-                    if self._raise_on_error:
-                        raise Exception(error_msg, "credentials_missing") from default_cred_error
 
         except ImportError as e:
             error_msg = f"Google Cloud BigQuery library not installed: {e}"
