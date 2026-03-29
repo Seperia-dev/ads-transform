@@ -58,7 +58,6 @@ class BingService:
         except Exception as e:
             GCPLogger.log(LogLevel.ERROR, "Bing", {
                 "session_id": self.session_id,
-                "refresh":refresh_token,
                 "message": f"Authentication error: {str(e)} ",
             })
             raise
