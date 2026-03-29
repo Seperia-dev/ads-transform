@@ -62,12 +62,7 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
             "session_id": session_id,
             "result": result,
         })
-        return TransferResponse(session_id=session_id,
-                task_id=background_task_log.task_id,
-                success=True,
-                rows_uploaded=result.get("rows_uploaded", 0),
-                accounts_processed=result.get("accounts_processed", 0)
-                )
+        return TransferResponse(session_id=session_id, **result)
 
     except Exception as e:
         _handle_error(e, session_id, background_task_log)
@@ -129,12 +124,7 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
             "session_id": session_id,
             "result": result,
         })
-        return TransferResponse(session_id=session_id,
-                task_id=background_task_log.task_id,
-                success=True,
-                rows_uploaded=result.get("rows_uploaded", 0),
-                accounts_processed=result.get("accounts_processed", 0)
-                )
+        return TransferResponse(session_id=session_id, **result)
 
     except Exception as e:
         _handle_error(e, session_id, background_task_log)
