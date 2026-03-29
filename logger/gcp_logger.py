@@ -4,7 +4,6 @@ import json
 from dotenv import load_dotenv
 from google.cloud import logging
 from enum import Enum
-import requests
 from logger.app_logger import get_logger
 from utils import Utils
 app_logger = get_logger()
