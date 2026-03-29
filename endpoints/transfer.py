@@ -22,7 +22,9 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
             "ad_name": req.ad_name,
             "from_x_days": req.from_x_days,
             "to_x_days": req.to_x_days,
+            "background": req.background,
         })
+        
         if not req.ad_name:
             raise ValueError("ad_name is required")
         if req.from_x_days is None or req.to_x_days is None:
@@ -30,12 +32,13 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
         if req.from_x_days < req.to_x_days:
             raise ValueError("from_x_days cannot be less than to_x_days")
 
-        if req.background:
-            background_task_log = _make_background_task_log(
+        background_task_log = _make_background_task_log(
                 name=f"transfer_all_{req.ad_name}",
                 req_args=req.model_dump(exclude={"background"}),
                 session_id=session_id,
             )
+
+        if req.background:
             transfer_service = _make_transfer_service(session_id, req.ad_name, background_task_log)
             background_tasks.add_task(
                 transfer_service.upload_all_accounts,
@@ -50,7 +53,7 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
                 accounts_processed=0,
             )
 
-        transfer_service = _make_transfer_service(session_id, req.ad_name)
+        transfer_service = _make_transfer_service(session_id, req.ad_name,background_task_log)
         result = transfer_service.upload_all_accounts(
             from_x_days=req.from_x_days,
             to_x_days=req.to_x_days,
@@ -78,6 +81,7 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
             "ad_name": req.ad_name,
             "from_x_days": req.from_x_days,
             "to_x_days": req.to_x_days,
+            "background": req.background,
         })
         if not req.account_id:
             raise ValueError("account_id is required")
@@ -88,12 +92,13 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
         if req.from_x_days < req.to_x_days:
             raise ValueError("from_x_days cannot be less than to_x_days")
 
-        if req.background:
-            background_task_log = _make_background_task_log(
+        background_task_log = _make_background_task_log(
                 name=f"transfer_account_{req.ad_name}",
                 req_args=req.model_dump(exclude={"background"}),
                 session_id=session_id,
             )
+
+        if req.background:
             transfer_service = _make_transfer_service(session_id, req.ad_name, background_task_log)
             background_tasks.add_task(
                 transfer_service.upload_account,
@@ -109,7 +114,7 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
                 accounts_processed=0,
             )
 
-        transfer_service = _make_transfer_service(session_id, req.ad_name)
+        transfer_service = _make_transfer_service(session_id, req.ad_name, background_task_log)
         result = transfer_service.upload_account(
             account_id=req.account_id,
             from_x_days=req.from_x_days,
