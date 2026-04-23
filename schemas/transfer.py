@@ -7,6 +7,7 @@ class TransferRequest(BaseModel):
     from_x_days:  int | None = None
     to_x_days:    int | None = None
     background:   bool = True
+    use_delete_rows: bool = True
 
 class TransferResponse(BaseModel):
     session_id:         str

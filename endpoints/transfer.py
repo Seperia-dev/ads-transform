@@ -23,6 +23,7 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
             "from_x_days": req.from_x_days,
             "to_x_days": req.to_x_days,
             "background": req.background,
+            "use_delete_rows":req.use_delete_rows,
         })
 
         if not req.ad_name:
@@ -44,6 +45,7 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
                 transfer_service.upload_all_accounts,
                 from_x_days=req.from_x_days,
                 to_x_days=req.to_x_days,
+                use_delete=req.use_delete_rows
             )
             return TransferResponse(
                 session_id=session_id,
@@ -57,6 +59,7 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
         result = transfer_service.upload_all_accounts(
             from_x_days=req.from_x_days,
             to_x_days=req.to_x_days,
+            use_delete=req.use_delete_rows,
         )
         GCPLogger.log(LogLevel.INFO, "transfer_all_accounts_result", {
             "session_id": session_id,
@@ -105,6 +108,7 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
                 account_id=req.account_id,
                 from_x_days=req.from_x_days,
                 to_x_days=req.to_x_days,
+                use_delete=req.use_delete_rows
             )
             return TransferResponse(
                 session_id=session_id,
@@ -119,6 +123,7 @@ def transfer_single_account(req: AccountTransferRequest, background_tasks: Backg
             account_id=req.account_id,
             from_x_days=req.from_x_days,
             to_x_days=req.to_x_days,
+            use_delete=req.use_delete_rows,
         )
         GCPLogger.log(LogLevel.INFO, "transfer_single_account_result", {
             "session_id": session_id,
