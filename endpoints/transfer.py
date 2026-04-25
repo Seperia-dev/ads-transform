@@ -11,7 +11,7 @@ router = APIRouter(prefix="/transfer", tags=["Transfer"])
 
 
 # ── /all ─────────────────────────────────────────────────────────────────────
-
+#this is transfer the performance (like click,spend,conversions,impressions) data as for all accounts
 @router.post("/all", response_model=TransferResponse)
 def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTasks):
     session_id = _make_session_id()
@@ -72,7 +72,7 @@ def transfer_all_accounts(req: TransferRequest, background_tasks: BackgroundTask
 
 
 # ── /account ─────────────────────────────────────────────────────────────────
-
+#this is transfer the performance (like click,spend,conversions,impressions) data as for single account
 @router.post("/account", response_model=TransferResponse)
 def transfer_single_account(req: AccountTransferRequest, background_tasks: BackgroundTasks):
     session_id = _make_session_id()
